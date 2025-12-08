@@ -23,6 +23,8 @@ pub fn parse_bytecode(bytes: Vec<u8>) -> Vec<Instruction> {
     let mut instructions = Vec::new();
     let mut i = 0;
 
+    let bytes = strip_solc_metadata(&bytes);
+
     while i < bytes.len() {
         let offset = i;
         let opcode = bytes[i];
@@ -52,6 +54,53 @@ pub fn parse_bytecode(bytes: Vec<u8>) -> Vec<Instruction> {
     }
 
     instructions
+}
+
+pub fn opcode_name(opcode: u8) -> String {
+    // from evm.codes
+    match opcode {
+        0x00 => String::from("STOP"),
+        0x15 => String::from("ISZERO"),
+        0x34 => String::from("CALLVALUE"),
+        0x50 => String::from("POP"),
+        0x52 => String::from("MSTORE"),
+        0x57 => String::from("JUMPI"),
+        0x5B => String::from("JUMPDEST"),
+        0x5f => String::from("PUSH0"),
+        0x5F..=0x7F => String::from("PUSH"),
+        0x80 => String::from("DUP1"),
+        0xFD => String::from("REVERT"),
+        0x08 => String::from("ADDMOD"),
+        0x0A => String::from("EXP"),
+        0x39 => String::from("CODECOPY"),
+        0xA1 => String::from("LOG1"),
+        0xF3 => String::from("RETURN"),
+        0xFE => String::from("INVALID"),
+        byte => format!("UNKNOWN(0x{:02x})", byte),
+    }
+}
+
+pub fn print_instruction(inst: &Instruction) {
+    print!("{:04x}: {}", inst.offset, opcode_name(inst.opcode));
+
+    if !inst.data.is_empty() {
+        print!("{} 0x", inst.opcode - 0x5f);
+        for byte in &inst.data {
+            print!("{:02x}", byte);
+        }
+    }
+    println!()
+}
+
+fn strip_solc_metadata(bytecode: &[u8]) -> &[u8] {
+    if let Some(pos) = bytecode
+        .windows(7)
+        .rposition(|w| w == b"\xa1\x64\x73\x6f\x6c\x63\x43")
+    {
+        &bytecode[..pos]
+    } else {
+        bytecode
+    }
 }
 
 #[cfg(test)]
@@ -97,5 +146,15 @@ mod tests {
             }
         );
         // ... and so on
+    }
+
+    // must be run via cargo test -- --nocapture
+    #[test]
+    fn print() {
+        let input: Vec<u8> = hex::decode("6080604052348015600e575f5ffd5b50601580601a5f395ff3fe60806040525f5ffdfea164736f6c634300081e000a").expect("invalid hex"); // empty.sol
+        let bytecode = parse_bytecode(input);
+        for inst in bytecode {
+            print_instruction(&inst);
+        }
     }
 }
