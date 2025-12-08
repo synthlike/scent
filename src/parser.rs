@@ -81,7 +81,12 @@ pub fn opcode_name(opcode: u8) -> String {
 }
 
 pub fn print_instruction(inst: &Instruction) {
-    print!("{:04x}: {}", inst.offset, opcode_name(inst.opcode));
+    print!(
+        "{:04x} {:<3}  {}",
+        inst.offset,
+        inst.opcode,
+        opcode_name(inst.opcode)
+    );
 
     if !inst.data.is_empty() {
         print!("{} 0x", inst.opcode - 0x5f);
