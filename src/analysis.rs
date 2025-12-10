@@ -4,6 +4,23 @@ use crate::parser::Instruction;
 
 pub struct Analysis {
     pub function_selectors: Vec<FunctionSelector>,
+    pub functions: Vec<Function>,
+}
+
+impl Analysis {
+    pub fn new() -> Self {
+        Self {
+            function_selectors: Vec::new(),
+            functions: Vec::new(),
+        }
+    }
+
+    pub fn from_instructions(instructions: &[Instruction]) -> Self {
+        Self {
+            function_selectors: analyze_function_selectors(instructions),
+            functions: analyze_functions(instructions),
+        }
+    }
 }
 
 #[derive(PartialEq)]
@@ -52,6 +69,84 @@ pub fn analyze_function_selectors(instructions: &[Instruction]) -> Vec<FunctionS
         .collect()
 }
 
+pub struct Function {
+    pub selector: [u8; 4],
+    pub start: usize,
+    pub end: usize,
+}
+
+pub fn analyze_functions(instructions: &[Instruction]) -> Vec<Function> {
+    instructions
+        .windows(4)
+        .filter_map(|w| {
+            let first = &w[0];
+            let second = &w[1];
+            let third = &w[2];
+            let fourth = &w[3];
+
+            // PUSH4
+            if first.opcode == 0x63 && first.data.len() == 4 &&
+            // EQ
+            second.opcode == 0x14 &&
+            // PUSH1/PUSH2/PUSH3
+            third.opcode >= 0x60 && third.opcode <= 0x62 &&
+            // JUMPI
+            fourth.opcode == 0x57
+            {
+                let mut selector = [0u8; 4];
+                selector.copy_from_slice(&first.data);
+
+                let start = bytes_to_usize(&third.data);
+                let end = find_function_end(instructions, start)?;
+
+                return Some(Function {
+                    selector,
+                    start,
+                    end,
+                });
+            }
+
+            None
+        })
+        .collect()
+}
+
+fn find_function_end(instructions: &[Instruction], start_offset: usize) -> Option<usize> {
+    let start_idx = instructions.iter().position(|i| i.offset == start_offset)?;
+
+    for i in start_idx..instructions.len() {
+        let inst = &instructions[i];
+
+        // RETURN, REVERT, STOP, INVALID
+        if matches!(inst.opcode, 0xF3 | 0xFD | 0x00 | 0xFE) {
+            return Some(inst.offset);
+        }
+
+        // JUMP (likely to shared return logic)
+        if inst.opcode == 0x56 {
+            // TODO: if forward jump that migt be still within function
+            // return only on backward jumps?
+            return Some(inst.offset);
+        }
+
+        // JUMPDEST (to next func)
+        // make sure we are not at the start_idx jumpdest
+        if inst.opcode == 0x5B && i > start_idx {
+            return Some(instructions[i - 1].offset);
+        }
+    }
+
+    instructions.last().map(|inst| inst.offset)
+}
+
+fn bytes_to_usize(bytes: &[u8]) -> usize {
+    let mut result = 0;
+    for &byte in bytes {
+        result = (result << 8) | byte as usize;
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -82,5 +177,53 @@ mod tests {
                 name: Some("func_11223344".to_string()),
             }
         )
+    }
+
+    #[test]
+    fn analyze_function() {
+        let instructions = vec![
+            Instruction {
+                offset: 0x00,
+                opcode: 0x63,
+                data: vec![0xa9, 0x05, 0x9c, 0xbb],
+            }, // PUSH4 selector
+            Instruction {
+                offset: 0x05,
+                opcode: 0x14,
+                data: vec![],
+            }, // EQ
+            Instruction {
+                offset: 0x06,
+                opcode: 0x61,
+                data: vec![0x02, 0x34],
+            }, // PUSH2 0x0234
+            Instruction {
+                offset: 0x09,
+                opcode: 0x57,
+                data: vec![],
+            }, // JUMPI
+            Instruction {
+                offset: 0x234,
+                opcode: 0x5B,
+                data: vec![],
+            }, // JUMPDEST
+            Instruction {
+                offset: 0x235,
+                opcode: 0x34,
+                data: vec![],
+            }, // CALLVALUE
+            Instruction {
+                offset: 0x236,
+                opcode: 0xF3,
+                data: vec![],
+            }, // RETURN
+        ];
+
+        let functions = analyze_functions(&instructions);
+
+        assert_eq!(functions.len(), 1);
+        assert_eq!(functions[0].selector, [0xa9, 0x05, 0x9c, 0xbb]);
+        assert_eq!(functions[0].start, 0x234);
+        assert_eq!(functions[0].end, 0x236);
     }
 }
