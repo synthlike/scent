@@ -153,7 +153,7 @@ pub fn opcode_name(opcode: u8) -> &'static str {
 
 pub fn print_instruction(inst: &Instruction) {
     print!(
-        "{:04x} {:<3}  {}",
+        "{:04x} {:<3x}  {}",
         inst.offset,
         inst.opcode,
         opcode_name(inst.opcode)
