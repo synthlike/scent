@@ -75,6 +75,18 @@ pub struct Function {
     pub end: usize,
 }
 
+impl fmt::Debug for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Function {{ selector: 0x{}, start: 0x{:04x}, end: 0x{:04x} }}",
+            hex::encode(&self.selector),
+            self.start,
+            self.end,
+        )
+    }
+}
+
 pub fn analyze_functions(instructions: &[Instruction]) -> Vec<Function> {
     instructions
         .windows(4)
