@@ -1,10 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use clap::{Parser, Subcommand};
-use scent::{
-    analysis::Analysis,
-    parser::{parse_bytecode, print_instruction},
-};
+use scent::{analysis::Analysis, parser::parse_bytecode, view::View};
 
 #[derive(Parser)]
 struct Cli {
@@ -44,9 +41,8 @@ fn main() {
             });
 
             let instructions = parse_bytecode(bytes);
-            for inst in instructions {
-                print_instruction(&inst);
-            }
+            let view = View::from_instructions(&instructions);
+            view.print_entries();
         }
         Commands::Funcs { path } => {
             let bytes = read_hex_file(&path).unwrap_or_else(|e| {
