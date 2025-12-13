@@ -43,7 +43,7 @@ fn main() {
                 std::process::exit(1);
             });
 
-            let program = Program::load(&bytes, true, false);
+            let program = Program::load(&bytes, false, false);
             let view = View::from_program(&program);
             print!("{}", view);
         }

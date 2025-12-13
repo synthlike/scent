@@ -11,7 +11,7 @@ impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = opcode_to_name(self.opcode);
 
-        write!(f, "{}", name)?;
+        write!(f, "{:02x} {}", self.opcode, name)?;
 
         if !self.data.is_empty() {
             write!(f, " 0x")?;
@@ -27,8 +27,6 @@ impl fmt::Display for Instruction {
 pub fn parse_bytecode(bytes: &[u8]) -> Vec<Instruction> {
     let mut instructions = Vec::new();
     let mut i = 0;
-
-    let bytes = strip_solc_metadata(&bytes);
 
     while i < bytes.len() {
         let offset = i;
@@ -59,17 +57,6 @@ pub fn parse_bytecode(bytes: &[u8]) -> Vec<Instruction> {
     }
 
     instructions
-}
-
-fn strip_solc_metadata(bytecode: &[u8]) -> &[u8] {
-    if let Some(pos) = bytecode
-        .windows(7)
-        .rposition(|w| w == b"\xa1\x64\x73\x6f\x6c\x63\x43")
-    {
-        &bytecode[..pos]
-    } else {
-        bytecode
-    }
 }
 
 pub fn opcode_to_name(opcode: u8) -> &'static str {

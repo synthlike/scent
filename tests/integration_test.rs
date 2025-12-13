@@ -1,7 +1,6 @@
 use scent::analysis::FunctionSelector;
 use scent::analysis::analyze_function_selectors;
 use scent::parser::parse_bytecode;
-use scent::view::View;
 
 #[test]
 fn counter_contract_function_selectors() {

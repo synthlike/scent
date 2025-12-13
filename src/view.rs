@@ -46,13 +46,7 @@ impl View {
                         comment: None,
                     });
                 }
-                SectionKind::Raw => {
-                    lines.push(Line {
-                        offset: 0,
-                        kind: LineKind::HexDump(section.raw_bytes.clone()),
-                        comment: None,
-                    });
-                }
+                SectionKind::Raw => {} // fallthrough
             }
 
             if let Some(instructions) = &section.instructions {
@@ -63,50 +57,17 @@ impl View {
                         comment: None,
                     });
                 }
+            } else {
+                lines.push(Line {
+                    offset: 0,
+                    kind: LineKind::HexDump(section.raw_bytes.to_vec()),
+                    comment: None,
+                });
             }
         }
 
         Self { lines }
     }
-
-    // pub fn from_instructions(instructions: &[Instruction], decorated: bool) -> Self {
-    //     let mut entries = Vec::new();
-
-    //     for inst in instructions {
-    //         if decorated && is_push_instruction(inst.opcode) {
-    //             let comment = decode_push_value(&inst.data);
-    //             entries.push(ViewEntry::InstructionWithComment(
-    //                 inst.clone(),
-    //                 comment,
-    //                 CommentPlacement::NextTo,
-    //             ));
-    //         } else {
-    //             entries.push(ViewEntry::Instruction(inst.clone()))
-    //         }
-    //     }
-
-    //     Self { entries }
-    // }
-
-    // pub fn print_entries(self) {
-    //     for entry in self.entries {
-    //         match entry {
-    //             ViewEntry::Instruction(inst) => {
-    //                 println!("{}", format_instruction(&inst));
-    //             }
-    //             ViewEntry::InstructionWithComment(inst, comment, placement) => match placement {
-    //                 CommentPlacement::Above => {
-    //                     println!("; {}", comment);
-    //                     println!("{}", format_instruction(&inst));
-    //                 }
-    //                 CommentPlacement::NextTo => {
-    //                     println!("{} ; {}", format_instruction(&inst), comment);
-    //                 }
-    //             },
-    //             ViewEntry::Label(_) => todo!(),
-    //         }
-    //     }
-    // }
 }
 
 impl fmt::Display for Line {
@@ -163,23 +124,4 @@ impl fmt::Display for View {
 
 // fn is_push_instruction(opcode: u8) -> bool {
 //     opcode >= 0x60 && opcode <= 0x7F
-// }
-
-// fn format_instruction(inst: &Instruction) -> String {
-//     let mut output = format!(
-//         "{:04x} {:<3x}  {}",
-//         inst.offset,
-//         inst.opcode,
-//         opcode_name(inst.opcode)
-//     );
-
-//     if !inst.data.is_empty() {
-//         output.push_str(&format!(
-//             "{} 0x{}",
-//             inst.opcode - 0x5f,
-//             hex::encode(&inst.data)
-//         ));
-//     }
-
-//     output
 // }

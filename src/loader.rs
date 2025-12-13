@@ -23,29 +23,30 @@ pub enum SectionKind {
 impl Program {
     pub fn load(bytes: &[u8], raw: bool, runtime: bool) -> Self {
         if raw {
-            let instructions = parser::parse_bytecode(bytes);
             return Program {
                 sections: vec![Section {
                     kind: SectionKind::Raw,
-                    instructions: Some(instructions),
+                    instructions: Some(parser::parse_bytecode(bytes)),
                     raw_bytes: bytes.to_vec(),
                     start_pc: 0,
                 }],
             };
         }
 
-        let (code_bytes, metadata_bytes) = Self::split_metadata(&bytes);
-
         let mut sections = Vec::new();
 
-        let split_offset = if runtime {
-            0 // no init in runtime mode, we assume runetime starts at 0 offset
+        let metadata_split_offset = Self::detect_metadata_split(&bytes);
+
+        let code_bytes = &bytes[0..metadata_split_offset];
+
+        let runtime_split_offset = if runtime {
+            0 // no init in runtime mode, we assume runtime starts at 0 offset
         } else {
-            Self::detect_runtime_split(code_bytes)
+            Self::detect_runtime_split(&code_bytes)
         };
 
-        if split_offset > 0 {
-            let init_bytes = &code_bytes[0..split_offset];
+        if runtime_split_offset > 0 {
+            let init_bytes = &code_bytes[0..runtime_split_offset];
             sections.push(Section {
                 kind: SectionKind::Init,
                 instructions: Some(parser::parse_bytecode(init_bytes)),
@@ -54,7 +55,7 @@ impl Program {
             });
         }
 
-        let runtime_bytes = &code_bytes[split_offset..];
+        let runtime_bytes = &code_bytes[runtime_split_offset..];
         if !runtime_bytes.is_empty() {
             sections.push(Section {
                 kind: SectionKind::Runtime,
@@ -64,11 +65,11 @@ impl Program {
             });
         }
 
-        if let Some(metadata) = metadata_bytes {
+        if metadata_split_offset < bytes.len() {
             sections.push(Section {
                 kind: SectionKind::Metadata,
                 instructions: None,
-                raw_bytes: metadata.to_vec(),
+                raw_bytes: bytes[metadata_split_offset..bytes.len()].to_vec(),
                 start_pc: 0,
             });
         }
@@ -76,13 +77,39 @@ impl Program {
         Program { sections }
     }
 
-    fn detect_runtime_split(_: &[u8]) -> usize {
-        // TODO: detect how to distinguish end of init section
+    // Detect runtime starts by looking for 0xF3FE bytes.
+    // It looks like solidity uses that as delimeter, although might break.
+    fn detect_runtime_split(bytes: &[u8]) -> usize {
+        for i in 0..bytes.len().saturating_sub(1) {
+            if bytes[i] == 0xF3 && bytes[i + 1] == 0xFE {
+                return i + 2;
+            }
+        }
+
         0
     }
 
-    fn split_metadata(bytes: &[u8]) -> (&[u8], Option<&[u8]>) {
-        // TODO: lookup end of the bytescode for metada length info
-        (bytes, None)
+    // Detect metadata starts by looking at the last two bytes - potential length of metadata.
+    // Then, based on the potential length it looks for pair of magic bytes 0xa2 + 0x64/0x65/0x66.
+    // When metadata not found it returns the size of the whole bytecode.
+    fn detect_metadata_split(bytes: &[u8]) -> usize {
+        if bytes.len() < 2 {
+            return bytes.len();
+        }
+
+        let metadata_length =
+            u16::from_be_bytes([bytes[bytes.len() - 2], bytes[bytes.len() - 1]]) as usize;
+
+        let metadata_start = bytes.len() - metadata_length - 2; // 2 is the size of metadata length
+
+        if metadata_start + 1 < bytes.len() {
+            let first = bytes[metadata_start];
+            let second = bytes[metadata_start + 1];
+            if first == 0xa2 && (second >= 0x64 && second <= 0x66) {
+                return metadata_start;
+            }
+        }
+
+        bytes.len()
     }
 }
