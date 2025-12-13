@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use clap::{Parser, Subcommand};
-use scent::{analysis::Analysis, parser::parse_bytecode, view::View};
+use scent::{loader::Program, view::View};
 
 #[derive(Parser)]
 struct Cli {
@@ -43,22 +43,18 @@ fn main() {
                 std::process::exit(1);
             });
 
-            let instructions = parse_bytecode(bytes);
+            let program = Program::load(&bytes, true, false);
+            let instructions = &program.sections[0]
+                .clone()
+                .instructions
+                .expect("no instructions in section");
+
             let view = View::from_instructions(&instructions, decorated);
             view.print_entries();
         }
-        Commands::Funcs { path } => {
-            let bytes = read_hex_file(&path).unwrap_or_else(|e| {
-                eprintln!("{}", e);
-                std::process::exit(1);
-            });
-
-            let instructions = parse_bytecode(bytes);
-            let analysis = Analysis::from_instructions(&instructions);
-
-            for func in analysis.functions {
-                println!("{:?}", &func) // TODO: proper print
-            }
+        Commands::Funcs { .. } => {
+            // XXX: removed until disasm is in decent shape
+            todo!()
         }
     }
 }

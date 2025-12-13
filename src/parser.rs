@@ -19,7 +19,7 @@ impl fmt::Debug for Instruction {
     }
 }
 
-pub fn parse_bytecode(bytes: Vec<u8>) -> Vec<Instruction> {
+pub fn parse_bytecode(bytes: &[u8]) -> Vec<Instruction> {
     let mut instructions = Vec::new();
     let mut i = 0;
 
@@ -75,7 +75,7 @@ mod tests {
     #[test]
     fn empty() {
         let input: Vec<u8> = hex::decode("6080604052348015600e575f5ffd5b50601580601a5f395ff3fe60806040525f5ffdfea164736f6c634300081e000a").expect("invalid hex"); // empty.sol
-        let bytecode = parse_bytecode(input);
+        let bytecode = parse_bytecode(&input);
 
         assert_eq!(
             bytecode[0],
