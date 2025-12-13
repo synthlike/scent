@@ -6,15 +6,30 @@ pub struct View {
 
 pub enum ViewEntry {
     Instruction(Instruction),
+    InstructionWithComment(Instruction, String, CommentPlacement),
     Label(String),
 }
 
+pub enum CommentPlacement {
+    Above,
+    NextTo,
+}
+
 impl View {
-    pub fn from_instructions(instructions: &[Instruction]) -> Self {
+    pub fn from_instructions(instructions: &[Instruction], decorated: bool) -> Self {
         let mut entries = Vec::new();
 
         for inst in instructions {
-            entries.push(ViewEntry::Instruction(inst.clone()))
+            if decorated && is_push_instruction(inst.opcode) {
+                let comment = decode_push_value(&inst.data);
+                entries.push(ViewEntry::InstructionWithComment(
+                    inst.clone(),
+                    comment,
+                    CommentPlacement::NextTo,
+                ));
+            } else {
+                entries.push(ViewEntry::Instruction(inst.clone()))
+            }
         }
 
         Self { entries }
@@ -24,25 +39,62 @@ impl View {
         for entry in self.entries {
             match entry {
                 ViewEntry::Instruction(inst) => {
-                    print!(
-                        "{:04x} {:<3x}  {}",
-                        inst.offset,
-                        inst.opcode,
-                        opcode_name(inst.opcode)
-                    );
-
-                    if !inst.data.is_empty() {
-                        print!("{} 0x", inst.opcode - 0x5f);
-                        for byte in &inst.data {
-                            print!("{:02x}", byte);
-                        }
-                    }
-                    println!()
+                    println!("{}", format_instruction(&inst));
                 }
+                ViewEntry::InstructionWithComment(inst, comment, placement) => match placement {
+                    CommentPlacement::Above => {
+                        println!("; {}", comment);
+                        println!("{}", format_instruction(&inst));
+                    }
+                    CommentPlacement::NextTo => {
+                        println!("{} ; {}", format_instruction(&inst), comment);
+                    }
+                },
                 ViewEntry::Label(_) => todo!(),
             }
         }
     }
+}
+
+fn decode_push_value(data: &[u8]) -> String {
+    if data.is_empty() {
+        return "0".to_string();
+    }
+
+    let mut value: u128 = 0;
+
+    // up to 16 bytes (u128)
+    if data.len() < 16 {
+        for &byte in data {
+            value = value * 256 + byte as u128;
+        }
+        format!("{}", value)
+    } else {
+        return "too large value".to_string();
+    }
+}
+
+fn is_push_instruction(opcode: u8) -> bool {
+    opcode >= 0x60 && opcode <= 0x7F
+}
+
+fn format_instruction(inst: &Instruction) -> String {
+    let mut output = format!(
+        "{:04x} {:<3x}  {}",
+        inst.offset,
+        inst.opcode,
+        opcode_name(inst.opcode)
+    );
+
+    if !inst.data.is_empty() {
+        output.push_str(&format!(
+            "{} 0x{}",
+            inst.opcode - 0x5f,
+            hex::encode(&inst.data)
+        ));
+    }
+
+    output
 }
 
 pub fn opcode_name(opcode: u8) -> &'static str {

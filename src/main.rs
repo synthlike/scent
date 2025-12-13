@@ -14,6 +14,9 @@ enum Commands {
     Disasm {
         #[arg(value_name = "PATH")]
         path: PathBuf,
+
+        #[arg(short, long)]
+        decorated: bool,
     },
     Funcs {
         #[arg(value_name = "PATH")]
@@ -34,14 +37,14 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.cmd {
-        Commands::Disasm { path } => {
+        Commands::Disasm { path, decorated } => {
             let bytes = read_hex_file(&path).unwrap_or_else(|e| {
                 eprintln!("{}", e);
                 std::process::exit(1);
             });
 
             let instructions = parse_bytecode(bytes);
-            let view = View::from_instructions(&instructions);
+            let view = View::from_instructions(&instructions, decorated);
             view.print_entries();
         }
         Commands::Funcs { path } => {
