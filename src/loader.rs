@@ -6,10 +6,10 @@ pub struct Program {
 
 #[derive(Clone)]
 pub struct Section {
-    kind: SectionKind,
-    raw_bytes: Vec<u8>,
+    pub kind: SectionKind,
+    pub raw_bytes: Vec<u8>,
     pub instructions: Option<Vec<Instruction>>,
-    start_pc: usize,
+    pub start_pc: usize,
 }
 
 #[derive(Clone)]

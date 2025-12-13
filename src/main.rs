@@ -37,20 +37,15 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.cmd {
-        Commands::Disasm { path, decorated } => {
+        Commands::Disasm { path, .. } => {
             let bytes = read_hex_file(&path).unwrap_or_else(|e| {
                 eprintln!("{}", e);
                 std::process::exit(1);
             });
 
             let program = Program::load(&bytes, true, false);
-            let instructions = &program.sections[0]
-                .clone()
-                .instructions
-                .expect("no instructions in section");
-
-            let view = View::from_instructions(&instructions, decorated);
-            view.print_entries();
+            let view = View::from_program(&program);
+            print!("{}", view);
         }
         Commands::Funcs { .. } => {
             // XXX: removed until disasm is in decent shape
