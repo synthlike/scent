@@ -15,7 +15,16 @@ enum Commands {
         #[arg(value_name = "PATH")]
         path: PathBuf,
 
-        #[arg(short, long)]
+        /// Raw bytecode input
+        #[arg(long)]
+        raw: bool,
+
+        /// Runtime bytecode input
+        #[arg(long)]
+        runtime: bool,
+
+        /// Decorate push data
+        #[arg(long)]
         decorated: bool,
     },
     Funcs {
@@ -37,14 +46,19 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.cmd {
-        Commands::Disasm { path, .. } => {
+        Commands::Disasm {
+            path,
+            raw,
+            runtime,
+            decorated,
+        } => {
             let bytes = read_hex_file(&path).unwrap_or_else(|e| {
                 eprintln!("{}", e);
                 std::process::exit(1);
             });
 
-            let program = Program::load(&bytes, false, false);
-            let view = View::from_program(&program);
+            let program = Program::load(&bytes, raw, runtime);
+            let view = View::from_program(&program, decorated);
             print!("{}", view);
         }
         Commands::Funcs { .. } => {

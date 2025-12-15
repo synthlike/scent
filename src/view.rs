@@ -20,7 +20,7 @@ pub enum LineKind {
 }
 
 impl View {
-    pub fn from_program(program: &Program) -> Self {
+    pub fn from_program(program: &Program, decorated: bool) -> Self {
         let mut lines = Vec::new();
 
         for section in &program.sections {
@@ -51,10 +51,16 @@ impl View {
 
             if let Some(instructions) = &section.instructions {
                 for instruction in instructions {
+                    let mut comment = None;
+
+                    if decorated && !instruction.data.is_empty() {
+                        comment = decorate_push_data(&instruction.data)
+                    }
+
                     lines.push(Line {
                         offset: section.start_pc + instruction.offset,
                         kind: LineKind::Instruction(instruction.clone()),
-                        comment: None,
+                        comment,
                     });
                 }
             } else {
@@ -68,6 +74,46 @@ impl View {
 
         Self { lines }
     }
+}
+
+fn decorate_push_data(data: &[u8]) -> Option<String> {
+    if data.is_empty() {
+        return None;
+    }
+
+    // don't interpret single byte
+    if data.len() == 1 {
+        return None;
+    }
+
+    // if data.len() == 4 {
+    //  TODO: function selectors
+    // }
+
+    // if data starts with 0x00/0x01 it's likely a number, zeros imply padding.
+    if data[0] == 0x00 || data[0] == 0x01 {
+        // unless it's too big, then it's probably an address?
+        if data.len() < 16 {
+            let val = bytes_to_u128(data);
+            return Some(format!("{}", val));
+        }
+    }
+
+    // if data is longer than two bytes and is purely printable characters we assume it's string
+    if data.len() > 2 && data.iter().all(|&b| b >= 0x20 && b <= 0x7e) {
+        let text = str::from_utf8(data).unwrap_or("");
+        return Some(format!("{:?}", text));
+    }
+
+    return None;
+}
+
+fn bytes_to_u128(bytes: &[u8]) -> u128 {
+    let mut val = 0u128;
+    for &b in bytes {
+        val = (val << 8) | b as u128;
+    }
+    val
 }
 
 impl fmt::Display for Line {
@@ -85,7 +131,7 @@ impl fmt::Display for Line {
             LineKind::Label(_) => unreachable!(),
         };
 
-        write!(f, "{:<35}", content)?;
+        write!(f, "{:<20}", content)?;
 
         if let Some(comment) = &self.comment {
             write!(f, "; {}", comment)?;
@@ -103,25 +149,3 @@ impl fmt::Display for View {
         Ok(())
     }
 }
-
-// fn decode_push_value(data: &[u8]) -> String {
-//     if data.is_empty() {
-//         return "0".to_string();
-//     }
-
-//     let mut value: u128 = 0;
-
-//     // up to 16 bytes (u128)
-//     if data.len() < 16 {
-//         for &byte in data {
-//             value = value * 256 + byte as u128;
-//         }
-//         format!("{}", value)
-//     } else {
-//         return "too large value".to_string();
-//     }
-// }
-
-// fn is_push_instruction(opcode: u8) -> bool {
-//     opcode >= 0x60 && opcode <= 0x7F
-// }
