@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use crate::{loader::Program, loader::SectionKind, parser::Instruction};
 
@@ -20,7 +20,11 @@ pub enum LineKind {
 }
 
 impl View {
-    pub fn from_program(program: &Program, decorated: bool) -> Self {
+    pub fn from_program(
+        program: &Program,
+        decorated: bool,
+        selectors: HashMap<u32, String>,
+    ) -> Self {
         let mut lines = Vec::new();
 
         for section in &program.sections {
@@ -54,7 +58,7 @@ impl View {
                     let mut comment = None;
 
                     if decorated && !instruction.data.is_empty() {
-                        comment = decorate_push_data(&instruction.data)
+                        comment = decorate_push_data(&instruction.data, &selectors)
                     }
 
                     lines.push(Line {
@@ -76,7 +80,7 @@ impl View {
     }
 }
 
-fn decorate_push_data(data: &[u8]) -> Option<String> {
+fn decorate_push_data(data: &[u8], selectors: &HashMap<u32, String>) -> Option<String> {
     if data.is_empty() {
         return None;
     }
@@ -86,16 +90,21 @@ fn decorate_push_data(data: &[u8]) -> Option<String> {
         return None;
     }
 
-    // if data.len() == 4 {
-    //  TODO: function selectors
-    // }
-
     // if data starts with 0x00/0x01 it's likely a number, zeros imply padding.
     if data[0] == 0x00 || data[0] == 0x01 {
         // unless it's too big, then it's probably an address?
         if data.len() < 16 {
             let val = bytes_to_u128(data);
             return Some(format!("{}", val));
+        }
+    }
+
+    // check for known function selectors
+    if data.len() == 4 {
+        let val = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
+
+        if let Some(selector) = selectors.get(&val) {
+            return Some(format!("{}", selector));
         }
     }
 

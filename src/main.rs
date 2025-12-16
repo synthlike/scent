@@ -1,7 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use clap::{Parser, Subcommand};
-use scent::{loader::Program, view::View};
+use scent::{loader::Program, selectors::load_selectors, view::View};
 
 #[derive(Parser)]
 struct Cli {
@@ -26,6 +26,10 @@ enum Commands {
         /// Decorate push data
         #[arg(long)]
         decorated: bool,
+
+        /// Selectors list as JSON
+        #[arg(long)]
+        selectors: PathBuf,
     },
     Funcs {
         #[arg(value_name = "PATH")]
@@ -51,6 +55,7 @@ fn main() {
             raw,
             runtime,
             decorated,
+            selectors,
         } => {
             let bytes = read_hex_file(&path).unwrap_or_else(|e| {
                 eprintln!("{}", e);
@@ -58,7 +63,8 @@ fn main() {
             });
 
             let program = Program::load(&bytes, raw, runtime);
-            let view = View::from_program(&program, decorated);
+            let selectors = load_selectors(selectors);
+            let view = View::from_program(&program, decorated, selectors);
             print!("{}", view);
         }
         Commands::Funcs { .. } => {
