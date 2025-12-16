@@ -61,6 +61,21 @@ impl View {
                         comment = decorate_push_data(&instruction.data, &selectors)
                     }
 
+                    // JUMPDEST
+                    if instruction.opcode == 0x5b {
+                        if let Some(entry) = program
+                            .entrypoints
+                            .iter()
+                            .find(|f| return instruction.offset == f.offset)
+                        {
+                            lines.push(Line {
+                                offset: section.start_pc + instruction.offset,
+                                kind: LineKind::Label(hex::encode(entry.selector)),
+                                comment: None, // TODO: lookup selectors
+                            });
+                        }
+                    }
+
                     lines.push(Line {
                         offset: section.start_pc + instruction.offset,
                         kind: LineKind::Instruction(instruction.clone()),
@@ -90,14 +105,15 @@ fn decorate_push_data(data: &[u8], selectors: &HashMap<u32, String>) -> Option<S
         return None;
     }
 
-    // if data starts with 0x00/0x01 it's likely a number, zeros imply padding.
-    if data[0] == 0x00 || data[0] == 0x01 {
-        // unless it's too big, then it's probably an address?
-        if data.len() < 16 {
-            let val = bytes_to_u128(data);
-            return Some(format!("{}", val));
-        }
-    }
+    // XXX: too many false positives, offsets are parsed as numbers
+    // // if data starts with 0x00/0x01 it's likely a number, zeros imply padding.
+    // if data[0] == 0x00 || data[0] == 0x01 {
+    //     // unless it's too big, then it's probably an address?
+    //     if data.len() < 16 {
+    //         let val = bytes_to_u128(data);
+    //         return Some(format!("{}", val));
+    //     }
+    // }
 
     // check for known function selectors
     if data.len() == 4 {
@@ -117,21 +133,13 @@ fn decorate_push_data(data: &[u8], selectors: &HashMap<u32, String>) -> Option<S
     return None;
 }
 
-fn bytes_to_u128(bytes: &[u8]) -> u128 {
-    let mut val = 0u128;
-    for &b in bytes {
-        val = (val << 8) | b as u128;
-    }
-    val
-}
-
 impl fmt::Display for Line {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let LineKind::Label(name) = &self.kind {
             return write!(f, "{}:", name);
         }
 
-        write!(f, "{:04x}: ", self.offset)?;
+        write!(f, "  {:04x}: ", self.offset)?; // padded with two spaces
 
         let content = match &self.kind {
             LineKind::Instruction(instruction) => format!("{}", instruction),

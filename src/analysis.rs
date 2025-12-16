@@ -5,6 +5,7 @@ use crate::parser::Instruction;
 pub struct Analysis {
     pub function_selectors: Vec<FunctionSelector>,
     pub functions: Vec<Function>,
+    pub function_entrypoints: Vec<FunctionEntrypoint>,
 }
 
 impl Analysis {
@@ -12,6 +13,7 @@ impl Analysis {
         Self {
             function_selectors: Vec::new(),
             functions: Vec::new(),
+            function_entrypoints: Vec::new(),
         }
     }
 
@@ -19,6 +21,7 @@ impl Analysis {
         Self {
             function_selectors: analyze_function_selectors(instructions),
             functions: analyze_functions(instructions),
+            function_entrypoints: analyze_function_entrypoints(instructions),
         }
     }
 }
@@ -27,17 +30,15 @@ impl Analysis {
 pub struct FunctionSelector {
     pub offset: usize,
     pub selector: [u8; 4],
-    pub name: Option<String>, // default or from sift selectors
 }
 
 impl fmt::Debug for FunctionSelector {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Selector {{ offset: {}, selector: 0x{}, name: {} }}",
+            "Selector {{ offset: {}, selector: 0x{} }}",
             self.offset,
             hex::encode(&self.selector),
-            self.name.as_deref().unwrap_or("unnamed"),
         )
     }
 }
@@ -49,7 +50,7 @@ pub fn analyze_function_selectors(instructions: &[Instruction]) -> Vec<FunctionS
             let first = &w[0];
             let second = &w[1];
 
-            // PUSH <selector>
+            // PUSH4 <selector>
             if first.opcode == 0x63 && first.data.len() == 4 &&
             // EQ
             second.opcode == 0x14
@@ -60,7 +61,6 @@ pub fn analyze_function_selectors(instructions: &[Instruction]) -> Vec<FunctionS
                 Some(FunctionSelector {
                     offset: first.offset,
                     selector,
-                    name: Some(format!("func_{:08x}", u32::from_be_bytes(selector))),
                 })
             } else {
                 None
@@ -116,6 +116,53 @@ pub fn analyze_functions(instructions: &[Instruction]) -> Vec<Function> {
                     start,
                     end,
                 });
+            }
+
+            None
+        })
+        .collect()
+}
+
+pub struct FunctionEntrypoint {
+    pub selector: [u8; 4],
+    pub offset: usize,
+}
+
+impl fmt::Debug for FunctionEntrypoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Function {{ selector: 0x{}, offset: 0x{:04x} }}",
+            hex::encode(&self.selector),
+            self.offset,
+        )
+    }
+}
+
+pub fn analyze_function_entrypoints(instructions: &[Instruction]) -> Vec<FunctionEntrypoint> {
+    instructions
+        .windows(4)
+        .filter_map(|w| {
+            let first = &w[0];
+            let second = &w[1];
+            let third = &w[2];
+            let fourth = &w[3];
+
+            // PUSH4
+            if first.opcode == 0x63 && first.data.len() == 4 &&
+            // EQ
+            second.opcode == 0x14 &&
+            // PUSH1/PUSH2/PUSH3
+            third.opcode >= 0x60 && third.opcode <= 0x62 &&
+            // JUMPI
+            fourth.opcode == 0x57
+            {
+                let mut selector = [0u8; 4];
+                selector.copy_from_slice(&first.data);
+
+                let offset = bytes_to_usize(&third.data);
+
+                return Some(FunctionEntrypoint { selector, offset });
             }
 
             None
@@ -186,7 +233,6 @@ mod tests {
             FunctionSelector {
                 offset: 100,
                 selector: [0x11, 0x22, 0x33, 0x44],
-                name: Some("func_11223344".to_string()),
             }
         )
     }

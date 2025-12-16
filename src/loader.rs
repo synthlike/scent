@@ -1,7 +1,11 @@
-use crate::parser::{self, Instruction};
+use crate::{
+    analysis::{Analysis, FunctionEntrypoint},
+    parser::{self, Instruction},
+};
 
 pub struct Program {
     pub sections: Vec<Section>,
+    pub entrypoints: Vec<FunctionEntrypoint>,
 }
 
 #[derive(Clone)]
@@ -30,6 +34,7 @@ impl Program {
                     raw_bytes: bytes.to_vec(),
                     start_pc: 0,
                 }],
+                entrypoints: Vec::new(),
             };
         }
 
@@ -55,14 +60,21 @@ impl Program {
             });
         }
 
+        let mut entrypoints = Vec::new();
+
         let runtime_bytes = &code_bytes[runtime_split_offset..];
         if !runtime_bytes.is_empty() {
+            let instructions = parser::parse_bytecode(runtime_bytes);
+
             sections.push(Section {
                 kind: SectionKind::Runtime,
-                instructions: Some(parser::parse_bytecode(runtime_bytes)),
+                instructions: Some(instructions.clone()),
                 raw_bytes: runtime_bytes.to_vec(),
                 start_pc: 0,
             });
+
+            let analysis = Analysis::from_instructions(&instructions);
+            entrypoints = analysis.function_entrypoints
         }
 
         if metadata_split_offset < bytes.len() {
@@ -74,7 +86,10 @@ impl Program {
             });
         }
 
-        Program { sections }
+        Program {
+            sections,
+            entrypoints,
+        }
     }
 
     // Detect runtime starts by looking for 0xF3FE bytes.
