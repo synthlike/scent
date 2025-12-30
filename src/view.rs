@@ -68,10 +68,13 @@ impl View {
                             .iter()
                             .find(|f| return instruction.offset == f.offset)
                         {
+                            let data = entry.selector;
+                            let val = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
+
                             lines.push(Line {
                                 offset: section.start_pc + instruction.offset,
-                                kind: LineKind::Label(hex::encode(entry.selector)),
-                                comment: None, // TODO: lookup selectors
+                                kind: LineKind::Label(format!("0x{}", hex::encode(entry.selector))),
+                                comment: selectors.get(&val).cloned(),
                             });
                         }
                     }
@@ -136,7 +139,13 @@ fn decorate_push_data(data: &[u8], selectors: &HashMap<u32, String>) -> Option<S
 impl fmt::Display for Line {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let LineKind::Label(name) = &self.kind {
-            return write!(f, "{}:", name);
+            write!(f, "{}:", name)?;
+
+            if let Some(comment) = &self.comment {
+                write!(f, " ; {}", comment)?;
+            }
+
+            return Ok(());
         }
 
         write!(f, "  {:04x}: ", self.offset)?; // padded with two spaces
