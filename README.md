@@ -1,6 +1,16 @@
 # scent
 
-scent is an EVM bytecode analyzer. Currently, it's only capability is parsing bytecode into opcodes via `disasm` subcommand.
+scent is an EVM bytecode analyzer.
+
+Currently, its only capability is parsing bytecode into opcodes via the `disasm` subcommand.  
+The disassembly view can be 'decorated' to provide additional information, such as annotating function selectors.
+
+It can also detect `.init`/`.code`/`.metadata` pseudo-sections of the binary using simple Solidity-targeted heuristics.
+
+Future plans include:
+- loading functions selectors from SQLite database
+- extended heuristics for the disassembly view
+- simple analysis mode that detects which storage slots are read from or written to by each external function
 
 ## Installation
 
@@ -16,9 +26,7 @@ The binary will be located at `./target/release/scent`.
 
 ## Usage
 
-Currently, only disassembly is supported via the `disasm` subcommand.
-
-By default, scent analyzes the bytecode and adds `.init`/`.code`/`.metadata` labels to help distinguish binary "sections".
+By default, scent analyzes the bytecode and adds `.init`/`.code`/`.metadata` labels to help distinguish binary pseudo-sections.
 It also labels `JUMPDEST` instructions based on detected function selectors.
 
 ```bash
@@ -79,7 +87,8 @@ $ scent disasm contract.bin
 
 Additionally, the `--raw` flag can be passed to disable all analysis, or `--runtime` to disable sections analysis while still labeling jump destinations for external functions.
 
-Push data can be decorated with helpful information. Currently, only function selector decoration is supported.
+`PUSH` instructions can be decorated with relevant information using `--decorated` flag.  
+Currently, only function selector decoration is supported.  
 Function selectors need to be provided via a JSON file (generated from [sift](https://github.com/synthlike/sift)), as shown below:
 
 ```bash
