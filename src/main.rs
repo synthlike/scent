@@ -29,7 +29,7 @@ enum Commands {
 
         /// Selectors list as JSON
         #[arg(long)]
-        selectors: PathBuf,
+        selectors: Option<PathBuf>,
     },
     Funcs {
         #[arg(value_name = "PATH")]
@@ -63,7 +63,9 @@ fn main() {
             });
 
             let program = Program::load(&bytes, raw, runtime);
-            let selectors = load_selectors(selectors);
+            let selectors = selectors
+                .map(|path| load_selectors(path))
+                .unwrap_or_default();
             let view = View::from_program(&program, decorated, selectors);
             print!("{}", view);
         }
