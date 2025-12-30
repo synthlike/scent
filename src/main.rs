@@ -23,11 +23,11 @@ enum Commands {
         #[arg(long)]
         runtime: bool,
 
-        /// Decorate push data
+        /// Decorate push data and labels
         #[arg(long)]
         decorated: bool,
 
-        /// Selectors list as JSON
+        /// Selectors list as JSON (implies --decorated)
         #[arg(long)]
         selectors: Option<PathBuf>,
     },
@@ -63,6 +63,7 @@ fn main() {
             });
 
             let program = Program::load(&bytes, raw, runtime);
+            let decorated = decorated || selectors.is_some();
             let selectors = selectors
                 .map(|path| load_selectors(path))
                 .unwrap_or_default();
