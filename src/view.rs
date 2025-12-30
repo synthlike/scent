@@ -74,7 +74,11 @@ impl View {
                             lines.push(Line {
                                 offset: section.start_pc + instruction.offset,
                                 kind: LineKind::Label(format!("0x{}", hex::encode(entry.selector))),
-                                comment: selectors.get(&val).cloned(),
+                                comment: if decorated {
+                                    selectors.get(&val).cloned()
+                                } else {
+                                    None
+                                },
                             });
                         }
                     }
