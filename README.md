@@ -1,8 +1,8 @@
 # scent
 
-scent is an EVM bytecode analyzer.
+scent is an EVM disassembler.
 
-Currently, its only capability is parsing bytecode into opcodes via the `disasm` subcommand.  
+Its main capability is parsing bytecode into opcodes.  
 The disassembly view can be 'decorated' to provide additional information, such as annotating function selectors.
 
 It can also detect `.init`/`.code`/`.metadata` pseudo-sections of the binary using simple Solidity-targeted heuristics.
@@ -10,7 +10,6 @@ It can also detect `.init`/`.code`/`.metadata` pseudo-sections of the binary usi
 Future plans include:
 - loading functions selectors from SQLite database
 - extended heuristics for the disassembly view
-- simple analysis mode that detects which storage slots are read from or written to by each external function
 
 ## Installation
 
@@ -30,7 +29,7 @@ By default, scent analyzes the bytecode and adds `.init`/`.code`/`.metadata` lab
 It also labels `JUMPDEST` instructions based on detected function selectors.
 
 ```bash
-$ scent disasm contract.bin
+$ scent contract.bin
 
 .init:
   0000: 60 PUSH1 0x80
@@ -92,7 +91,7 @@ Currently, only function selector decoration is supported.
 Function selectors need to be provided via a JSON file (generated from [sift](https://github.com/synthlike/sift)), as shown below:
 
 ```bash
-$ scent disasm contract.bin --decorated --selectors selectors.json
+$ scent contract.bin --decorated --selectors selectors.json
 
 ; ...
   001f: 63 PUSH4 0x20965255 ; getValue()
